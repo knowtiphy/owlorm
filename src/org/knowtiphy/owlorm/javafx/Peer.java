@@ -180,8 +180,8 @@ public class Peer extends Entity implements IPeer
 	public static void delta(Model added, Model deleted)
 	{
 		System.err.println("START  DELTA");
-		JenaUtils.printModel(added, "+");
-		JenaUtils.printModel(deleted, "-");
+		//JenaUtils.printModel(added, "+");
+		//JenaUtils.printModel(deleted, "-");
 
 		//  create peer objects by handling added triples of the form X rdf:type Y
 		var addPeers = added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null);
@@ -193,8 +193,12 @@ public class Peer extends Entity implements IPeer
 			if (!PEERS.containsKey(subject))
 			{
 				var constructor = CONSTRUCTORS.get(stmt.getObject().toString());
-				assert constructor != null;
-				PEERS.put(subject, constructor.apply(subject));
+				//assert constructor != null;
+
+				if (constructor != null)
+				{
+					PEERS.put(subject, constructor.apply(subject));
+				}
 			}
 		}
 

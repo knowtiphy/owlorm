@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
+
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -183,8 +185,13 @@ public class Peer extends Entity implements IPeer
 		}
 	}
 
-	public static void delta(Model added, Model deleted)
+	//	process an OWL model change
+	public static void delta(Model added, Model deleted, Predicate<Statement> predicate)
 	{
+		System.err.println("START  DELTA");
+		JenaUtils.printModel(added, "+", predicate);
+		JenaUtils.printModel(deleted, "-", predicate);
+
 		//  create peer objects by handling added triples of the form X rdf:type Y
 		var addPeers = added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null);
 
@@ -257,5 +264,7 @@ public class Peer extends Entity implements IPeer
 				PEERS.remove(stmt.getSubject().toString());
 			});
 		}
+
+		System.err.println("END  DELTA");
 	}
 }

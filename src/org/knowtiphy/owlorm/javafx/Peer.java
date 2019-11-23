@@ -28,7 +28,8 @@ import org.knowtiphy.utils.JenaUtils;
 public class Peer extends Entity implements IPeer
 {
 
-	public final static Map<String, IPeer> PEERS = new ConcurrentHashMap();
+	public final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
+	public final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
 
 	private final SimpleBooleanProperty disabled = new SimpleBooleanProperty(false);
@@ -38,8 +39,8 @@ public class Peer extends Entity implements IPeer
 	public Peer(String id)
 	{
 		super(id);
-		updaters = new HashMap();
-		deleters = new HashMap();
+		updaters = new HashMap<>();
+		deleters = new HashMap<>();
 		assert !PEERS.containsKey(id) : id + "::" + PEERS.get(id);
 		PEERS.put(id, this);
 	}
@@ -57,7 +58,7 @@ public class Peer extends Entity implements IPeer
 
 	public void declareU(String predicate, BooleanProperty property)
 	{
-		updaters.put(predicate, new PropertyUpdater(property, Functions.STMT_TO_BOOL));
+		updaters.put(predicate, new PropertyUpdater<>(property, Functions.STMT_TO_BOOL));
 	}
 
 	public void declareU(String predicate, IntegerProperty property)
@@ -67,22 +68,22 @@ public class Peer extends Entity implements IPeer
 
 	public void declareU(String predicate, ObjectProperty<LocalDate> property)
 	{
-		updaters.put(predicate, new PropertyUpdater(property, Functions.STMT_TO_DATE));
+		updaters.put(predicate, new PropertyUpdater<>(property, Functions.STMT_TO_DATE));
 	}
 
 	public void declareU(String predicate, StringProperty property)
 	{
-		updaters.put(predicate, new PropertyUpdater(property, Functions.STMT_TO_STRING));
+		updaters.put(predicate, new PropertyUpdater<>(property, Functions.STMT_TO_STRING));
 	}
 
 	public <T> void declareU(String predicate, ObservableList<T> set, Function<Statement, T> f)
 	{
-		updaters.put(predicate, new CollectionUpdater(set, f));
+		updaters.put(predicate, new CollectionUpdater<>(set, f));
 	}
 
 	public void declareU(String predicate, ObservableList<String> set)
 	{
-		updaters.put(predicate, new CollectionUpdater(set, Functions.STMT_TO_STRING));
+		updaters.put(predicate, new CollectionUpdater<>(set, Functions.STMT_TO_STRING));
 	}
 
 	public void declareD(String predicate, Consumer<Statement> deleter)
@@ -110,12 +111,17 @@ public class Peer extends Entity implements IPeer
 		}
 	}
 
-	public static void add(String type, Function<String, IPeer> constructor)
+	public static void addConstructor(String type, Function<String, IPeer> constructor)
 	{
 		assert !CONSTRUCTORS.containsKey(type);
 		CONSTRUCTORS.put(type, constructor);
 	}
 
+	public static void addRoot(String type, Consumer<IPeer> root)
+	{
+		assert !ROOTS.containsKey(type);
+		ROOTS.put(type, root);
+	}
 	private final static SimpleSelector SELECT_DATA_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
 	{
 		@Override
@@ -197,7 +203,13 @@ public class Peer extends Entity implements IPeer
 
 				if (constructor != null)
 				{
-					PEERS.put(subject, constructor.apply(subject));
+					IPeer peer = constructor.apply(subject);
+					PEERS.put(subject, peer);
+					var root = ROOTS.get(stmt.getObject().toString());
+					if(root != null)
+					{
+						root.accept(peer);
+					}
 				}
 			}
 		}

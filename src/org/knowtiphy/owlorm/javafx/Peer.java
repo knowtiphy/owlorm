@@ -185,10 +185,6 @@ public class Peer extends Entity implements IPeer
 
 	public static void delta(Model added, Model deleted)
 	{
-		System.err.println("START  DELTA");
-		JenaUtils.printModel(added, "+");
-		JenaUtils.printModel(deleted, "-");
-
 		//  create peer objects by handling added triples of the form X rdf:type Y
 		var addPeers = added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null);
 
@@ -196,16 +192,15 @@ public class Peer extends Entity implements IPeer
 		{
 			var stmt = addPeers.nextStatement();
 			var subject = stmt.getSubject().toString();
+			var object = stmt.getObject().toString();
 			if (!PEERS.containsKey(subject))
 			{
-				var constructor = CONSTRUCTORS.get(stmt.getObject().toString());
-				//assert constructor != null;
-
+				var constructor = CONSTRUCTORS.get(object);
 				if (constructor != null)
 				{
 					IPeer peer = constructor.apply(subject);
 					PEERS.put(subject, peer);
-					var root = ROOTS.get(stmt.getObject().toString());
+					var root = ROOTS.get(object);
 					if(root != null)
 					{
 						root.accept(peer);
@@ -221,7 +216,6 @@ public class Peer extends Entity implements IPeer
 		{
 			var stmt = deleteAttrRelationships.nextStatement();
 			var peerSubject = PEERS.get(stmt.getSubject().toString());
-			// assert peerSubject != null;
 			if (peerSubject != null)
 			{
 				delete(peerSubject.getDeleter(stmt.getPredicate().toString()), stmt);
@@ -234,8 +228,6 @@ public class Peer extends Entity implements IPeer
 		{
 			var stmt = peerAttributes.nextStatement();
 			var peerSubject = PEERS.get(stmt.getSubject().toString());
-			//assert peerSubject != null;
-			//	TODO -- this needs to go -- something to do with CID parts
 			if (peerSubject != null)
 			{
 				update(peerSubject.getUpdater(stmt.getPredicate().toString()), stmt);
@@ -251,24 +243,19 @@ public class Peer extends Entity implements IPeer
 			var peerSubject = PEERS.get(stmt.getSubject().toString());
 			if (peerSubject != null)
 			{
-				//assert peerSubject != null;
 				update(peerSubject.getUpdater(stmt.getPredicate().toString()), stmt);
 			}
 		}
 
 		//  delete peers by handling deleted triples of the form X rdf:type Y
 		var deletePeers = deleted.listStatements(null, deleted.createProperty(RDF.type.getURI()), (Resource) null);
-		assert deletePeers != null;
 		while (deletePeers.hasNext())
 		{
 			var stmt = deletePeers.nextStatement();
 			Platform.runLater(() ->
 			{
-				assert PEERS.get(stmt.getSubject().toString()) != null;
 				PEERS.remove(stmt.getSubject().toString());
 			});
 		}
-
-		System.err.println("END  DELTA");
 	}
 }

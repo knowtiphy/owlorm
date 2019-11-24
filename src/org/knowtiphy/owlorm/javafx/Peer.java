@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -32,11 +31,6 @@ import java.util.logging.Logger;
 public class Peer extends Entity implements IPeer
 {
 	private static final Logger LOGGER = Logger.getLogger(Peer.class.getName());
-
-	static
-	{
-		LOGGER.setLevel(Level.FINE);
-	}
 
 	private final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
@@ -168,8 +162,8 @@ public class Peer extends Entity implements IPeer
 
 	private static IPeer construct(Function<String, IPeer> constructor, String subject)
 	{
+		assert !PEERS.containsKey(subject) : subject;
 		IPeer peer = constructor.apply(subject);
-		//assert !PEERS.containsKey(subject) : subject;
 		PEERS.put(subject, peer);
 		return peer;
 	}
@@ -211,12 +205,10 @@ public class Peer extends Entity implements IPeer
 	//	process an OWL model change
 	public static void delta(Model added, Model deleted, Predicate<Statement> predicate)
 	{
-		System.err.println("LEVEL = " + Logger.getLogger(Peer.class.getName()).getLevel());
-		LOGGER.log(Level.FINE, "START DELTA");
-		LOGGER.log(Level.FINE, () -> JenaUtils.toString("+", added, predicate));
-		LOGGER.log(Level.FINE, () -> JenaUtils.toString("-", deleted, predicate));
+		LOGGER.fine(() -> JenaUtils.toString("+", added, predicate));
+		LOGGER.fine(() -> JenaUtils.toString("-", deleted, predicate));
 
-		JenaUtils.printModel(added, "+", predicate);
+		//JenaUtils.printModel(added, "+", predicate);
 		//  create peer objects by handling added triples of the form X rdf:type Y
 		var addPeers = added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null);
 
@@ -283,8 +275,6 @@ public class Peer extends Entity implements IPeer
 			var stmt = deletePeers.nextStatement();
 			Platform.runLater(() -> PEERS.remove(stmt.getSubject().toString()));
 		}
-
-		LOGGER.log(Level.FINE, "END DELTA");
 	}
 
 	public static void delta(Model added, Model deleted)

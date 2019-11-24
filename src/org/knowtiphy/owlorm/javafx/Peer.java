@@ -35,24 +35,24 @@ public class Peer extends Entity implements IPeer
 	private final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
 
 	private final SimpleBooleanProperty disabled = new SimpleBooleanProperty(false);
-	private final Map<String, Consumer<Statement>> updatePeer, deletePeer;
+	private final Map<String, Consumer<Statement>> peerUpdater, peerDeleter;
 
 	//	TODO fix this
 	@SuppressWarnings("LeakingThisInConstructor")
 	public Peer(String id)
 	{
 		super(id);
-		updatePeer = new HashMap<>();
-		deletePeer = new HashMap<>();
+		peerUpdater = new HashMap<>();
+		peerDeleter = new HashMap<>();
 		assert !PEERS.containsKey(id) : id + "::" + PEERS.get(id);
 		PEERS.put(id, this);
 	}
 
 	public static IPeer peer(Resource resource)
 	{
-		IPeer p = PEERS.get(resource.toString());
-		assert p != null : resource;
-		return p;
+		IPeer peer = PEERS.get(resource.toString());
+		assert peer != null : resource;
+		return peer;
 	}
 
 	@Override
@@ -63,54 +63,55 @@ public class Peer extends Entity implements IPeer
 
 	public void declareU(String predicate, Consumer<Statement> updater)
 	{
-		updatePeer.put(predicate, updater);
+		peerUpdater.put(predicate, updater);
 	}
 
 	public void declareU(String predicate, BooleanProperty property)
 	{
-		updatePeer.put(predicate, new PropertyUpdater<>(property, JenaUtils::getB));
+		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getB));
 	}
 
+	@SuppressWarnings("unchecked")
 	public void declareU(String predicate, IntegerProperty property)
 	{
-		updatePeer.put(predicate, new PropertyUpdater(property, (Function<Statement, Integer>) JenaUtils::getI));
+		peerUpdater.put(predicate, new PropertyUpdater(property, (Function<Statement, Integer>) JenaUtils::getI));
 	}
 
 	public void declareU(String predicate, ObjectProperty<LocalDate> property)
 	{
-		updatePeer.put(predicate, new PropertyUpdater<>(property, JenaUtils::getLD));
+		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getLD));
 	}
 
 	public void declareU(String predicate, StringProperty property)
 	{
-		updatePeer.put(predicate, new PropertyUpdater<>(property, JenaUtils::getS));
+		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getS));
 	}
 
 	public <T> void declareU(String predicate, ObservableList<T> set, Function<Statement, T> f)
 	{
-		updatePeer.put(predicate, new CollectionUpdater<>(set, f));
+		peerUpdater.put(predicate, new CollectionUpdater<>(set, f));
 	}
 
 	public void declareU(String predicate, ObservableList<String> set)
 	{
-		updatePeer.put(predicate, new CollectionUpdater<>(set, JenaUtils::getS));
+		peerUpdater.put(predicate, new CollectionUpdater<>(set, JenaUtils::getS));
 	}
 
 	public void declareD(String predicate, Consumer<Statement> deleter)
 	{
-		deletePeer.put(predicate, deleter);
+		peerDeleter.put(predicate, deleter);
 	}
 
 	@Override
 	public Consumer<Statement> getUpdater(String attribute)
 	{
-		return updatePeer.get(attribute);
+		return peerUpdater.get(attribute);
 	}
 
 	@Override
 	public Consumer<Statement> getDeleter(String attribute)
 	{
-		return deletePeer.get(attribute);
+		return peerDeleter.get(attribute);
 	}
 
 	public static void disable(Collection<IPeer> peers)

@@ -1,28 +1,28 @@
 package org.knowtiphy.owlorm.javafx;
 
-import java.util.function.Consumer;
-import java.util.function.Function;
 import javafx.collections.ObservableList;
 import org.apache.jena.rdf.model.Statement;
+
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * @author graham
  */
 class CollectionUpdater<T> implements Consumer<Statement>
 {
-
     private final ObservableList<T> list;
-    private final Function<Statement, T> extractor;
+    private final Function<Statement, T> extractValue;
 
-    public CollectionUpdater(ObservableList<T> list, Function<Statement, T> extractor)
+    public CollectionUpdater(ObservableList<T> list, Function<Statement, T> extractValue)
     {
         this.list = list;
-        this.extractor = extractor;
+        this.extractValue = extractValue;
     }
 
     @Override
     public void accept(Statement stmt)
     {
-        list.add(extractor.apply(stmt));
+        list.add(extractValue.apply(stmt));
     }
 }

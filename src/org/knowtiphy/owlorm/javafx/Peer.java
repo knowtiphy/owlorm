@@ -2,15 +2,6 @@ package org.knowtiphy.owlorm.javafx;
 
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
-import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -24,27 +15,44 @@ import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.vocabulary.RDF;
 import org.knowtiphy.utils.JenaUtils;
 
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
 /**
  * @author graham
  */
 public class Peer extends Entity implements IPeer
 {
 
-	public final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
-	public final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
+	private final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
+	private final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
 
 	private final SimpleBooleanProperty disabled = new SimpleBooleanProperty(false);
-	private final Map<String, Consumer<Statement>> updaters, deleters;
+	private final Map<String, Consumer<Statement>> updatePeer, deletePeer;
 
+	//	TODO fix this
 	@SuppressWarnings("LeakingThisInConstructor")
 	public Peer(String id)
 	{
 		super(id);
-		updaters = new HashMap<>();
-		deleters = new HashMap<>();
+		updatePeer = new HashMap<>();
+		deletePeer = new HashMap<>();
 		assert !PEERS.containsKey(id) : id + "::" + PEERS.get(id);
 		PEERS.put(id, this);
+	}
+
+	public static IPeer peer(Resource resource)
+	{
+		IPeer p = PEERS.get(resource.toString());
+		assert p != null : resource;
+		return p;
 	}
 
 	@Override
@@ -55,54 +63,54 @@ public class Peer extends Entity implements IPeer
 
 	public void declareU(String predicate, Consumer<Statement> updater)
 	{
-		updaters.put(predicate, updater);
+		updatePeer.put(predicate, updater);
 	}
 
 	public void declareU(String predicate, BooleanProperty property)
 	{
-		updaters.put(predicate, new PropertyUpdater<>(property, Functions.STMT_TO_BOOL));
+		updatePeer.put(predicate, new PropertyUpdater<>(property, JenaUtils::getB));
 	}
 
 	public void declareU(String predicate, IntegerProperty property)
 	{
-		updaters.put(predicate, new PropertyUpdater(property, Functions.STMT_TO_INT));
+		updatePeer.put(predicate, new PropertyUpdater(property, (Function<Statement, Integer>) JenaUtils::getI));
 	}
 
 	public void declareU(String predicate, ObjectProperty<LocalDate> property)
 	{
-		updaters.put(predicate, new PropertyUpdater<>(property, Functions.STMT_TO_DATE));
+		updatePeer.put(predicate, new PropertyUpdater<>(property, JenaUtils::getLD));
 	}
 
 	public void declareU(String predicate, StringProperty property)
 	{
-		updaters.put(predicate, new PropertyUpdater<>(property, Functions.STMT_TO_STRING));
+		updatePeer.put(predicate, new PropertyUpdater<>(property, JenaUtils::getS));
 	}
 
 	public <T> void declareU(String predicate, ObservableList<T> set, Function<Statement, T> f)
 	{
-		updaters.put(predicate, new CollectionUpdater<>(set, f));
+		updatePeer.put(predicate, new CollectionUpdater<>(set, f));
 	}
 
 	public void declareU(String predicate, ObservableList<String> set)
 	{
-		updaters.put(predicate, new CollectionUpdater<>(set, Functions.STMT_TO_STRING));
+		updatePeer.put(predicate, new CollectionUpdater<>(set, JenaUtils::getS));
 	}
 
 	public void declareD(String predicate, Consumer<Statement> deleter)
 	{
-		deleters.put(predicate, deleter);
+		deletePeer.put(predicate, deleter);
 	}
 
 	@Override
 	public Consumer<Statement> getUpdater(String attribute)
 	{
-		return updaters.get(attribute);
+		return updatePeer.get(attribute);
 	}
 
 	@Override
 	public Consumer<Statement> getDeleter(String attribute)
 	{
-		return deleters.get(attribute);
+		return deletePeer.get(attribute);
 	}
 
 	public static void disable(Collection<IPeer> peers)
@@ -124,6 +132,7 @@ public class Peer extends Entity implements IPeer
 		assert !ROOTS.containsKey(type);
 		ROOTS.put(type, root);
 	}
+
 	private final static SimpleSelector SELECT_DATA_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
 	{
 		@Override
@@ -208,7 +217,7 @@ public class Peer extends Entity implements IPeer
 					IPeer peer = constructor.apply(subject);
 					PEERS.put(subject, peer);
 					var root = ROOTS.get(object);
-					if(root != null)
+					if (root != null)
 					{
 						root.accept(peer);
 					}
@@ -259,12 +268,14 @@ public class Peer extends Entity implements IPeer
 		while (deletePeers.hasNext())
 		{
 			var stmt = deletePeers.nextStatement();
-			Platform.runLater(() ->
-			{
-				PEERS.remove(stmt.getSubject().toString());
-			});
+			Platform.runLater(() -> PEERS.remove(stmt.getSubject().toString()));
 		}
 
 		System.err.println("END  DELTA");
+	}
+
+	public static void delta(Model added, Model deleted)
+	{
+		delta(added, deleted, stmt -> false);
 	}
 }

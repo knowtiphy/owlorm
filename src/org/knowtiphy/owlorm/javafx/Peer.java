@@ -23,12 +23,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @author graham
  */
 public class Peer extends Entity implements IPeer
 {
+	private static final Logger LOGGER = Logger.getLogger(Peer.class.getName());
+
+	static
+	{
+		LOGGER.setLevel(Level.FINE);
+	}
 
 	private final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
@@ -37,15 +45,11 @@ public class Peer extends Entity implements IPeer
 	private final SimpleBooleanProperty disabled = new SimpleBooleanProperty(false);
 	private final Map<String, Consumer<Statement>> peerUpdater, peerDeleter;
 
-	//	TODO fix this
-	@SuppressWarnings("LeakingThisInConstructor")
 	public Peer(String id)
 	{
 		super(id);
 		peerUpdater = new HashMap<>();
 		peerDeleter = new HashMap<>();
-		assert !PEERS.containsKey(id) : id + "::" + PEERS.get(id);
-		PEERS.put(id, this);
 	}
 
 	public static IPeer peer(Resource resource)
@@ -161,6 +165,15 @@ public class Peer extends Entity implements IPeer
 		}
 	};
 
+
+	private static IPeer construct(Function<String, IPeer> constructor, String subject)
+	{
+		IPeer peer = constructor.apply(subject);
+		//assert !PEERS.containsKey(subject) : subject;
+		PEERS.put(subject, peer);
+		return peer;
+	}
+
 	private static void update(Consumer<Statement> updater, Statement stmt)
 	{
 		if (updater != null)
@@ -198,30 +211,29 @@ public class Peer extends Entity implements IPeer
 	//	process an OWL model change
 	public static void delta(Model added, Model deleted, Predicate<Statement> predicate)
 	{
-		System.err.println("START  DELTA");
-		JenaUtils.printModel(added, "+", predicate);
-		JenaUtils.printModel(deleted, "-", predicate);
+		System.err.println("LEVEL = " + Logger.getLogger(Peer.class.getName()).getLevel());
+		LOGGER.log(Level.FINE, "START DELTA");
+		LOGGER.log(Level.FINE, () -> JenaUtils.toString("+", added, predicate));
+		LOGGER.log(Level.FINE, () -> JenaUtils.toString("-", deleted, predicate));
 
+		JenaUtils.printModel(added, "+", predicate);
 		//  create peer objects by handling added triples of the form X rdf:type Y
 		var addPeers = added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null);
 
 		while (addPeers.hasNext())
 		{
 			var stmt = addPeers.nextStatement();
-			var subject = stmt.getSubject().toString();
-			var object = stmt.getObject().toString();
-			if (!PEERS.containsKey(subject))
+			var peerId = stmt.getSubject().toString();
+			var type = stmt.getObject().toString();
+
+			var constructor = CONSTRUCTORS.get(type);
+			if (constructor != null)
 			{
-				var constructor = CONSTRUCTORS.get(object);
-				if (constructor != null)
+				IPeer peer = construct(constructor, peerId);
+				var root = ROOTS.get(type);
+				if (root != null)
 				{
-					IPeer peer = constructor.apply(subject);
-					PEERS.put(subject, peer);
-					var root = ROOTS.get(object);
-					if (root != null)
-					{
-						root.accept(peer);
-					}
+					root.accept(peer);
 				}
 			}
 		}
@@ -272,11 +284,11 @@ public class Peer extends Entity implements IPeer
 			Platform.runLater(() -> PEERS.remove(stmt.getSubject().toString()));
 		}
 
-		System.err.println("END  DELTA");
+		LOGGER.log(Level.FINE, "END DELTA");
 	}
 
 	public static void delta(Model added, Model deleted)
 	{
-		delta(added, deleted, stmt -> false);
+		delta(added, deleted, stmt -> true);
 	}
 }

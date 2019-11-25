@@ -170,11 +170,11 @@ public class Peer extends Entity implements IPeer
 	};
 
 
-	private static IPeer construct(Function<String, IPeer> constructor, String subject)
+	private static IPeer construct(Function<String, IPeer> constructor, String id)
 	{
-		assert !PEERS.containsKey(subject) : subject;
-		IPeer peer = constructor.apply(subject);
-		PEERS.put(subject, peer);
+		assert !PEERS.containsKey(id) : id;
+		IPeer peer = constructor.apply(id);
+		PEERS.put(id, peer);
 		return peer;
 	}
 

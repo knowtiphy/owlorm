@@ -95,6 +95,16 @@ public class Peer extends Entity implements IPeer
 		peerUpdater.put(predicate, new CollectionUpdater<>(set, JenaUtils::getS));
 	}
 
+	public <T> void declareD(String predicate, ObservableList<T> set, Function<Statement, T> f)
+	{
+		peerDeleter.put(predicate, new CollectionDeleter<>(set, f));
+	}
+
+	public <T> void declareD(String predicate, ObservableList<T> set)
+	{
+		peerDeleter.put(predicate, new CollectionDeleter<>(set, s  -> (T) peer(s.getObject().asResource())));
+	}
+
 	public void declareD(String predicate, Consumer<Statement> deleter)
 	{
 		peerDeleter.put(predicate, deleter);

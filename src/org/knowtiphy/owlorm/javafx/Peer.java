@@ -15,7 +15,7 @@ import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.vocabulary.RDF;
 import org.knowtiphy.utils.JenaUtils;
 
-import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -75,7 +75,7 @@ public class Peer extends Entity implements IPeer
 		peerUpdater.put(predicate, new PropertyUpdater(property, (Function<Statement, Integer>) JenaUtils::getI));
 	}
 
-	public void declareU(String predicate, ObjectProperty<LocalDate> property)
+	public void declareU(String predicate, ObjectProperty<ZonedDateTime> property)
 	{
 		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getLD));
 	}

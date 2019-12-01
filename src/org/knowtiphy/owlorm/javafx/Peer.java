@@ -240,6 +240,19 @@ public class Peer extends Entity implements IPeer
 			}
 		}
 
+		//  initialize relationships between peers by handling added triples of the form X Y Z,
+		//  where Z is not a literal (so Y is an object property), but not rdf:type
+		var peerRelationships = added.listStatements(SELECT_OBJECT_PROPERTIES);
+		while (peerRelationships.hasNext())
+		{
+			var stmt = peerRelationships.nextStatement();
+			var peerSubject = PEERS.get(stmt.getSubject().toString());
+			if (peerSubject != null)
+			{
+				update(peerSubject.getUpdater(stmt.getPredicate().toString()), stmt);
+			}
+		}
+
 		//  delete peer attributes and relationships by handling deleted triples of the
 		//  form X Y Z, where Y is not rdf:type
 		var deleteAttrRelationships = deleted.listStatements(SELECT_NON_RDF_TYPE);
@@ -258,19 +271,6 @@ public class Peer extends Entity implements IPeer
 		while (peerAttributes.hasNext())
 		{
 			var stmt = peerAttributes.nextStatement();
-			var peerSubject = PEERS.get(stmt.getSubject().toString());
-			if (peerSubject != null)
-			{
-				update(peerSubject.getUpdater(stmt.getPredicate().toString()), stmt);
-			}
-		}
-
-		//  initialize relationships between peers by handling added triples of the form X Y Z,
-		//  where Z is not a literal (so Y is an object property), but not rdf:type
-		var peerRelationships = added.listStatements(SELECT_OBJECT_PROPERTIES);
-		while (peerRelationships.hasNext())
-		{
-			var stmt = peerRelationships.nextStatement();
 			var peerSubject = PEERS.get(stmt.getSubject().toString());
 			if (peerSubject != null)
 			{

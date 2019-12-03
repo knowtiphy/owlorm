@@ -69,9 +69,9 @@ public class Peer extends Entity implements IPeer
 		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getB));
 	}
 
-	@SuppressWarnings("unchecked")
 	public void declareU(String predicate, IntegerProperty property)
 	{
+		//noinspection rawtypes,unchecked
 		peerUpdater.put(predicate, new PropertyUpdater(property, (Function<Statement, Integer>) JenaUtils::getI));
 	}
 
@@ -95,6 +95,18 @@ public class Peer extends Entity implements IPeer
 		peerUpdater.put(predicate, new CollectionUpdater<>(set, JenaUtils::getS));
 	}
 
+	public <T extends IEntity> void declareOU(String predicate, ObservableList<T> list)
+	{
+		peerUpdater.put(predicate, new CollectionUpdater<>(list,
+				stmt -> {
+					//noinspection unchecked
+					T obj = (T) peer(stmt.getObject().asResource());
+					assert !list.contains(obj) : obj.getId();
+					return obj;
+				}));
+
+	}
+
 	public <T> void declareD(String predicate, ObservableList<T> set, Function<Statement, T> f)
 	{
 		peerDeleter.put(predicate, new CollectionDeleter<>(set, f));
@@ -102,7 +114,8 @@ public class Peer extends Entity implements IPeer
 
 	public <T> void declareD(String predicate, ObservableList<T> set)
 	{
-		peerDeleter.put(predicate, new CollectionDeleter<>(set, s  -> (T) peer(s.getObject().asResource())));
+		//noinspection unchecked
+		peerDeleter.put(predicate, new CollectionDeleter<>(set, s -> (T) peer(s.getObject().asResource())));
 	}
 
 	public void declareD(String predicate, Consumer<Statement> deleter)

@@ -4,6 +4,7 @@ import javafx.application.Platform;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Selector;
 import org.apache.jena.rdf.model.SimpleSelector;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.vocabulary.RDF;
@@ -11,6 +12,7 @@ import org.knowtiphy.utils.JenaUtils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -24,7 +26,7 @@ public class PeerState
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
 	private final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
 
-	private final static SimpleSelector SELECT_DATA_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
+	private final static SimpleSelector DATA_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
 	{
 		@Override
 		public boolean test(Statement stmt)
@@ -32,21 +34,13 @@ public class PeerState
 			return stmt.getObject().isLiteral();
 		}
 	};
-	private final static SimpleSelector SELECT_OBJECT_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
+
+	private final static SimpleSelector OBJECT_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
 	{
 		@Override
 		public boolean test(Statement stmt)
 		{
 			return !stmt.getObject().isLiteral() && !stmt.getPredicate().getURI().equals(RDF.type.getURI());
-		}
-	};
-
-	private final static SimpleSelector SELECT_NON_RDF_TYPE = new SimpleSelector(null, null, (RDFNode) null)
-	{
-		@Override
-		public boolean test(Statement stmt)
-		{
-			return !stmt.getPredicate().getURI().equals(RDF.type.getURI());
 		}
 	};
 
@@ -77,32 +71,15 @@ public class PeerState
 		return peer;
 	}
 
-	private static void update(Consumer<Statement> updater, Statement stmt)
+	private static void apply(Consumer<Statement> change, Statement stmt)
 	{
-		if (updater != null)
+		if (change != null)
 		{
 			Platform.runLater(() ->
 			{
 				try
 				{
-					updater.accept(stmt);
-				} catch (RuntimeException ex)
-				{
-					ex.printStackTrace(System.err);
-				}
-			});
-		}
-	}
-
-	private static void delete(Consumer<Statement> deleter, Statement stmt)
-	{
-		if (deleter != null)
-		{
-			Platform.runLater(() ->
-			{
-				try
-				{
-					deleter.accept(stmt);
+					change.accept(stmt);
 				} catch (Exception ex)
 				{
 					ex.printStackTrace(System.err);
@@ -111,79 +88,80 @@ public class PeerState
 		}
 	}
 
-	//	process an OWL model change
+	private static void update(IPeer peer, Statement stmt)
+	{
+		apply(peer.getUpdater(stmt.getPredicate().toString()), stmt);
+	}
+
+	private static void delete(IPeer peer, Statement stmt)
+	{
+		apply(peer.getDeleter(stmt.getPredicate().toString()), stmt);
+	}
+
+	//  introduce new peer objects by handling added triples of the form S rdf:type O
+	private static void introduceNewPeers(Model added)
+	{
+		added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null)
+				.forEachRemaining(stmt ->
+				{
+					var type = stmt.getObject().toString();
+					var constructor = CONSTRUCTORS.get(type);
+					if (constructor != null)
+					{
+						IPeer peer = construct(constructor, stmt.getSubject().toString());
+						var root = ROOTS.get(type);
+						if (root != null)
+						{
+							root.accept(peer);
+						}
+					}
+				});
+	}
+
+	//	delete existing peers by handling deleted triples of the form X rdf:type Y
+	private static void deleteExistingPeers(Model deleted)
+	{
+		deleted.listStatements(null, deleted.createProperty(RDF.type.getURI()), (Resource) null)
+				.forEachRemaining(stmt -> Platform.runLater(() -> PEERS.remove(stmt.getSubject().toString())));
+	}
+
+	//  process (delete/update-add) attributes of, or relationships between, existing peer objects
+
+	private static void processExisting(Model model, Selector selector, BiConsumer<IPeer, Statement> process)
+	{
+		model.listStatements(selector).forEachRemaining(stmt ->
+		{
+			var subjectPeer = PEERS.get(stmt.getSubject().toString());
+			if (subjectPeer != null)
+			{
+				process.accept(subjectPeer, stmt);
+			}
+		});
+	}
+
+	//	process an OWL model change -- constraints are that we must:
+	//	-	delete attributes of existing object before we update/add attribtes (since changes are deletes followed by adds)
+	//	-	introduce objects before we update an attribute as the attribute may be for the newly introduced objects.
+	//	So we choose the order
+	//  delete attributes of existing peer objects
+	//  delete relationships between existing peer objects
+	//	introduce new peers
+	//  update/add attributes of existing peer objects (which may have just been introduced)
+	//  update/add relationships between existing peer objects (which may have just been introduced)
+	//  delete existing peers
+
 	public static void delta(Model added, Model deleted, Predicate<Statement> predicate)
 	{
 		LOGGER.fine(() -> JenaUtils.toString("+", added, predicate));
 		LOGGER.fine(() -> JenaUtils.toString("-", deleted, predicate));
 
-		//JenaUtils.printModel(added, "+", predicate);
-		//  create peer objects by handling added triples of the form X rdf:type Y
-		var addPeers = added.listStatements(null, added.createProperty(RDF.type.getURI()), (Resource) null);
-
-		while (addPeers.hasNext())
-		{
-			var stmt = addPeers.nextStatement();
-			var peerId = stmt.getSubject().toString();
-			var type = stmt.getObject().toString();
-
-			var constructor = CONSTRUCTORS.get(type);
-			if (constructor != null)
-			{
-				IPeer peer = construct(constructor, peerId);
-				var root = ROOTS.get(type);
-				if (root != null)
-				{
-					root.accept(peer);
-				}
-			}
-		}
-
-		//  initialize relationships between peers by handling added triples of the form X Y Z,
-		//  where Z is not a literal (so Y is an object property), but not rdf:type
-		var peerRelationships = added.listStatements(SELECT_OBJECT_PROPERTIES);
-		while (peerRelationships.hasNext())
-		{
-			var stmt = peerRelationships.nextStatement();
-			var peerSubject = PEERS.get(stmt.getSubject().toString());
-			if (peerSubject != null)
-			{
-				update(peerSubject.getUpdater(stmt.getPredicate().toString()), stmt);
-			}
-		}
-
-		//  delete peer attributes and relationships by handling deleted triples of the
-		//  form X Y Z, where Y is not rdf:type
-		var deleteAttrRelationships = deleted.listStatements(SELECT_NON_RDF_TYPE);
-		while (deleteAttrRelationships.hasNext())
-		{
-			var stmt = deleteAttrRelationships.nextStatement();
-			var peerSubject = PEERS.get(stmt.getSubject().toString());
-			if (peerSubject != null)
-			{
-				delete(peerSubject.getDeleter(stmt.getPredicate().toString()), stmt);
-			}
-		}
-
-		//  initialize attributes of peers by handling added triples of the form X Y Z, where Z is a literal
-		var peerAttributes = added.listStatements(SELECT_DATA_PROPERTIES);
-		while (peerAttributes.hasNext())
-		{
-			var stmt = peerAttributes.nextStatement();
-			var peerSubject = PEERS.get(stmt.getSubject().toString());
-			if (peerSubject != null)
-			{
-				update(peerSubject.getUpdater(stmt.getPredicate().toString()), stmt);
-			}
-		}
-
-		//  delete peers by handling deleted triples of the form X rdf:type Y
-		var deletePeers = deleted.listStatements(null, deleted.createProperty(RDF.type.getURI()), (Resource) null);
-		while (deletePeers.hasNext())
-		{
-			var stmt = deletePeers.nextStatement();
-			Platform.runLater(() -> PEERS.remove(stmt.getSubject().toString()));
-		}
+		processExisting(deleted, DATA_PROPERTIES, PeerState::delete);
+		processExisting(deleted, OBJECT_PROPERTIES, PeerState::delete);
+		deleteExistingPeers(deleted);
+		introduceNewPeers(added);
+		//	which way around should we do the next two?
+		processExisting(added, DATA_PROPERTIES, PeerState::update);
+		processExisting(added, OBJECT_PROPERTIES, PeerState::update);
 	}
 
 	public static void delta(Model added, Model deleted)

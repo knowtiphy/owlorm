@@ -43,4 +43,12 @@ public class Entity implements IEntity
 		final Entity other = (Entity) obj;
 		return Objects.equals(this.id, other.id);
 	}
+
+	@Override
+	public String toString()
+	{
+		return "Entity{" +
+				"id='" + id + '\'' +
+				'}';
+	}
 }

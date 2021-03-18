@@ -6,6 +6,10 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.ObservableList;
+import org.apache.jena.query.QuerySolution;
+import org.apache.jena.query.ResultSet;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.knowtiphy.utils.JenaUtils;
 
@@ -16,19 +20,21 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static org.knowtiphy.utils.JenaUtils.P;
+import static org.knowtiphy.utils.JenaUtils.R;
+
 /**
  * @author graham
  */
 public class Peer extends Entity implements IPeer
 {
 	private final SimpleBooleanProperty disabled = new SimpleBooleanProperty(false);
-	private final Map<String, Consumer<Statement>> peerUpdater, peerDeleter;
+	private final Map<String, Consumer<Statement>> peerUpdater= new HashMap<>();
+	private final Map<String, Consumer<Statement>>  peerDeleter= new HashMap<>();
 
 	public Peer(String id)
 	{
 		super(id);
-		peerUpdater = new HashMap<>();
-		peerDeleter = new HashMap<>();
 	}
 
 	@Override
@@ -115,9 +121,71 @@ public class Peer extends Entity implements IPeer
 
 	public static void disable(Collection<IPeer> peers)
 	{
-		for (IPeer peer : peers)
+		peers.forEach(peer -> peer.disableProperty().set(true));
+	}
+
+	//	apply a change
+	//	note: this doesn't do any later{} calls -- callers of this have to manage UI
+	//	thread issues
+	private void apply(Consumer<Statement> change, Statement stmt)
+	{
+		//  ignore -- just means we don't have an updater/deleter for that property
+		if (change != null)
 		{
-			peer.disableProperty().set(true);
+			try
+			{
+				change.accept(stmt);
+			}
+			catch (Exception ex)
+			{
+				ex.printStackTrace(System.err);
+			}
 		}
+	}
+
+	public void oldInit(Model model)
+	{
+		model.listStatements().forEachRemaining(s -> apply(getUpdater(s.getPredicate().toString()), s));
+	}
+
+	//	this is a hack but will do for the moment
+	public void oldInit(QuerySolution it)
+	{
+		Model m = ModelFactory.createDefaultModel();
+		m.add(m.createResource(getId()), m.createProperty(it.get("p").toString()), it.get("o"));
+		apply(getUpdater(it.get("p").toString()), m.listStatements().nextStatement());
+	}
+
+	public void oldInit(ResultSet rs)
+	{
+		rs.forEachRemaining(this::oldInit);
+	}
+
+	public void initialize(Statement stmt)
+	{
+		apply(getUpdater(stmt.getPredicate().toString()), stmt);
+	}
+
+	public void initialize(Model model)
+	{
+		model.listStatements().forEachRemaining(this::initialize);
+	}
+
+	//	this is a hack but will do for the moment
+	public void initialize(QuerySolution it)
+	{
+		Model m = ModelFactory.createDefaultModel();
+		m.add(R(m ,getId()), P(m, it.get("p").toString()), it.get("o"));
+		initialize(m);
+	}
+
+	public void initialize(ResultSet rs)
+	{
+		rs.forEachRemaining(this::initialize);
+	}
+
+	private void delete(Statement stmt)
+	{
+		apply(getDeleter(stmt.getPredicate().toString()), stmt);
 	}
 }

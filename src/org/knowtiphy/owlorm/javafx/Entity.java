@@ -47,8 +47,6 @@ public class Entity implements IEntity
 	@Override
 	public String toString()
 	{
-		return "Entity{" +
-				"id='" + id + '\'' +
-				'}';
+		return "Entity{id=" + id + "}";
 	}
 }

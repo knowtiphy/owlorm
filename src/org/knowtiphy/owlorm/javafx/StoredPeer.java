@@ -1,18 +1,16 @@
 package org.knowtiphy.owlorm.javafx;
 
-import org.knowtiphy.babbage.storage.IStorage;
-
-public class StoredPeer extends Peer
+public class StoredPeer<S> extends Peer
 {
-	private IStorage storage;
+	private final S storage;
 
-	public StoredPeer(String id, IStorage storage)
+	public StoredPeer(String id, S storage)
 	{
 		super(id);
 		this.storage = storage;
 	}
 
-	public IStorage getStorage()
+	public S getStorage()
 	{
 		return storage;
 	}

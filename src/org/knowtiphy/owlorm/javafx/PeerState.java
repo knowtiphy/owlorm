@@ -18,31 +18,12 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
+//	TODO -- all this code should go away
 public class PeerState
 {
-	private static final Logger LOGGER = Logger.getLogger(PeerState.class.getName());
-
 	private final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
 	private final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
-
-	private final static SimpleSelector DATA_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
-	{
-		@Override
-		public boolean test(Statement stmt)
-		{
-			return stmt.getObject().isLiteral();
-		}
-	};
-
-	private final static SimpleSelector OBJECT_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
-	{
-		@Override
-		public boolean test(Statement stmt)
-		{
-			return !stmt.getObject().isLiteral() && !stmt.getPredicate().getURI().equals(RDF.type.getURI());
-		}
-	};
 
 	public static IPeer peer(Resource resource)
 	{
@@ -51,16 +32,22 @@ public class PeerState
 		return peer;
 	}
 
+	public static IPeer construct(String name, String type)
+	{
+		assert CONSTRUCTORS.containsKey(type);
+		return construct(CONSTRUCTORS.get(type), name);
+	}
+
 	public static void addConstructor(String type, Function<String, IPeer> constructor)
 	{
 		assert !CONSTRUCTORS.containsKey(type);
 		CONSTRUCTORS.put(type, constructor);
 	}
 
-	public static void addRoot(String type, Consumer<IPeer> root)
+	public static void addRoots(String type, Consumer<IPeer> consumer)
 	{
 		assert !ROOTS.containsKey(type);
-		ROOTS.put(type, root);
+		ROOTS.put(type, consumer);
 	}
 
 	private static IPeer construct(Function<String, IPeer> constructor, String id)
@@ -71,8 +58,11 @@ public class PeerState
 		return peer;
 	}
 
+	//	TODO -- all the code below here is crap and needs to go
+
 	private static void apply(Consumer<Statement> change, Statement stmt)
 	{
+		//  ignore -- just means we don't have an updater/deleter for that property
 		if (change != null)
 		{
 			Platform.runLater(() ->
@@ -80,7 +70,8 @@ public class PeerState
 				try
 				{
 					change.accept(stmt);
-				} catch (Exception ex)
+				}
+				catch (Exception ex)
 				{
 					ex.printStackTrace(System.err);
 				}
@@ -88,9 +79,9 @@ public class PeerState
 		}
 	}
 
-	private static void update(IPeer peer, Statement stmt)
+	public static void delta(Model added, Model deleted)
 	{
-		apply(peer.getUpdater(stmt.getPredicate().toString()), stmt);
+		delta(added, deleted, stmt -> true);
 	}
 
 	private static void delete(IPeer peer, Statement stmt)
@@ -125,6 +116,12 @@ public class PeerState
 				.forEachRemaining(stmt -> Platform.runLater(() -> PEERS.remove(stmt.getSubject().toString())));
 	}
 
+	public static void update(IPeer peer, Statement stmt)
+	{
+		System.out.println("IN UPDATE PEER FOR STATEMENT " + stmt);
+		apply(peer.getUpdater(stmt.getPredicate().toString()), stmt);
+	}
+//
 	//  process (delete/update-add) attributes of, or relationships between, existing peer objects
 
 	private static void processExisting(Model model, Selector selector, BiConsumer<IPeer, Statement> process)
@@ -139,16 +136,17 @@ public class PeerState
 		});
 	}
 
+
 	//	process an OWL model change -- constraints are that we must:
-	//	-	delete attributes of existing object before we update/add attribtes (since changes are deletes followed by adds)
-	//	-	introduce objects before we update an attribute as the attribute may be for the newly introduced objects.
-	//	So we choose the order
-	//  delete attributes of existing peer objects
-	//  delete relationships between existing peer objects
-	//	introduce new peers
-	//  update/add attributes of existing peer objects (which may have just been introduced)
-	//  update/add relationships between existing peer objects (which may have just been introduced)
-	//  delete existing peers
+//	-	delete attributes of existing object before we update/add attribtes (since changes are deletes followed by adds)
+//	-	introduce objects before we update an attribute as the attribute may be for the newly introduced objects.
+//	So we choose the order
+//  delete attributes of existing peer objects
+//  delete relationships between existing peer objects
+//	introduce new peers
+//  update/add attributes of existing peer objects (which may have just been introduced)
+//  update/add relationships between existing peer objects (which may have just been introduced)
+//  delete existing peers
 
 	public static void delta(Model added, Model deleted, Predicate<Statement> predicate)
 	{
@@ -164,8 +162,26 @@ public class PeerState
 		processExisting(added, OBJECT_PROPERTIES, PeerState::update);
 	}
 
-	public static void delta(Model added, Model deleted)
+	private static final Logger LOGGER = Logger.getLogger(PeerState.class.getName());
+
+	private final static SimpleSelector DATA_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
 	{
-		delta(added, deleted, stmt -> true);
-	}
+		@Override
+		public boolean test(Statement stmt)
+		{
+			return stmt.getObject().isLiteral();
+		}
+	};
+
+	private final static SimpleSelector OBJECT_PROPERTIES = new SimpleSelector(null, null, (RDFNode) null)
+	{
+		@Override
+		public boolean test(Statement stmt)
+		{
+			return !stmt.getObject().isLiteral() && !stmt.getPredicate().getURI().equals(RDF.type.getURI());
+		}
+	};
 }
+
+
+

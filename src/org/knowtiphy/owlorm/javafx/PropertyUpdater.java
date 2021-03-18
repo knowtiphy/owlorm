@@ -11,18 +11,18 @@ import java.util.function.Function;
  */
 class PropertyUpdater<T> implements Consumer<Statement>
 {
-    private final Property<T> property;
-    private final Function<Statement, T> extractValue;
+	private final Property<T> property;
+	private final Function<Statement, T> extractValue;
 
-    public PropertyUpdater(Property<T> property, Function<Statement, T> extractValue)
-    {
-        this.property = property;
-        this.extractValue = extractValue;
-    }
+	public PropertyUpdater(Property<T> property, Function<Statement, T> extractValue)
+	{
+		this.property = property;
+		this.extractValue = extractValue;
+	}
 
-    @Override
-    public void accept(Statement stmt)
-    {
-        property.setValue(extractValue.apply(stmt));
-    }
+	@Override
+	public void accept(Statement stmt)
+	{
+		property.setValue(extractValue.apply(stmt));
+	}
 }

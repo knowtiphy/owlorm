@@ -41,6 +41,7 @@ public class Entity implements IEntity
 			return false;
 		}
 		final Entity other = (Entity) obj;
+		//	two entities are equal of their ids are the same
 		return Objects.equals(this.id, other.id);
 	}
 

@@ -43,6 +43,18 @@ public class Peer extends Entity implements IPeer
 		return disabled;
 	}
 
+	@Override
+	public Consumer<Statement> getUpdater(String attribute)
+	{
+		return peerUpdater.get(attribute);
+	}
+
+	@Override
+	public Consumer<Statement> getDeleter(String attribute)
+	{
+		return peerDeleter.get(attribute);
+	}
+
 	public void declareU(String predicate, Consumer<Statement> updater)
 	{
 		peerUpdater.put(predicate, updater);
@@ -55,8 +67,7 @@ public class Peer extends Entity implements IPeer
 
 	public void declareU(String predicate, IntegerProperty property)
 	{
-		//noinspection rawtypes,unchecked
-		peerUpdater.put(predicate, new PropertyUpdater(property, (Function<Statement, Integer>) JenaUtils::getI));
+		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getI));
 	}
 
 	public void declareU(String predicate, ObjectProperty<ZonedDateTime> property)
@@ -72,6 +83,12 @@ public class Peer extends Entity implements IPeer
 	public <T> void declareU(String predicate, ObservableList<T> set, Function<Statement, T> f)
 	{
 		peerUpdater.put(predicate, new CollectionUpdater<>(set, f));
+	}
+
+	public <K, V> void declareU(String predicate, Map<K,V> map,
+								Function<Statement, K> key, Function<Statement, V> value)
+	{
+		peerUpdater.put(predicate, new MapUpdater<>(map, key, value));
 	}
 
 	public void declareU(String predicate, ObservableList<String> set)
@@ -107,23 +124,6 @@ public class Peer extends Entity implements IPeer
 		peerDeleter.put(predicate, deleter);
 	}
 
-	@Override
-	public Consumer<Statement> getUpdater(String attribute)
-	{
-		return peerUpdater.get(attribute);
-	}
-
-	@Override
-	public Consumer<Statement> getDeleter(String attribute)
-	{
-		return peerDeleter.get(attribute);
-	}
-
-	public static void disable(Collection<IPeer> peers)
-	{
-		peers.forEach(peer -> peer.disableProperty().set(true));
-	}
-
 	//	apply a change
 	//	note: this doesn't do any later{} calls -- callers of this have to manage UI
 	//	thread issues
@@ -138,45 +138,23 @@ public class Peer extends Entity implements IPeer
 			}
 			catch (Exception ex)
 			{
+				//	TODO -- how do we handle this?
 				ex.printStackTrace(System.err);
 			}
 		}
 	}
 
-	public void oldInit(Model model)
+	public void initialize(Model model)
 	{
 		model.listStatements().forEachRemaining(s -> apply(getUpdater(s.getPredicate().toString()), s));
 	}
 
 	//	this is a hack but will do for the moment
-	public void oldInit(QuerySolution it)
-	{
-		Model m = ModelFactory.createDefaultModel();
-		m.add(m.createResource(getId()), m.createProperty(it.get("p").toString()), it.get("o"));
-		apply(getUpdater(it.get("p").toString()), m.listStatements().nextStatement());
-	}
-
-	public void oldInit(ResultSet rs)
-	{
-		rs.forEachRemaining(this::oldInit);
-	}
-
-	public void initialize(Statement stmt)
-	{
-		apply(getUpdater(stmt.getPredicate().toString()), stmt);
-	}
-
-	public void initialize(Model model)
-	{
-		model.listStatements().forEachRemaining(this::initialize);
-	}
-
-	//	this is a hack but will do for the moment
 	public void initialize(QuerySolution it)
 	{
-		Model m = ModelFactory.createDefaultModel();
-		m.add(R(m ,getId()), P(m, it.get("p").toString()), it.get("o"));
-		initialize(m);
+		Model model = ModelFactory.createDefaultModel();
+		model.add(R(model ,getId()), P(model, it.get("p").toString()), it.get("o"));
+		initialize(model);
 	}
 
 	public void initialize(ResultSet rs)
@@ -184,8 +162,8 @@ public class Peer extends Entity implements IPeer
 		rs.forEachRemaining(this::initialize);
 	}
 
-	private void delete(Statement stmt)
+	public static void disable(Collection<IPeer> peers)
 	{
-		apply(getDeleter(stmt.getPredicate().toString()), stmt);
+		peers.forEach(peer -> peer.disableProperty().set(true));
 	}
 }

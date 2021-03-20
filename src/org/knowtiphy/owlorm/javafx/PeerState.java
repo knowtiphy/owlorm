@@ -23,7 +23,6 @@ public class PeerState
 {
 	private final static Map<String, IPeer> PEERS = new ConcurrentHashMap<>();
 	private final static Map<String, Function<String, IPeer>> CONSTRUCTORS = new ConcurrentHashMap<>();
-	private final static Map<String, Consumer<IPeer>> ROOTS = new ConcurrentHashMap<>();
 
 	public static IPeer peer(Resource resource)
 	{
@@ -42,12 +41,6 @@ public class PeerState
 	{
 		assert !CONSTRUCTORS.containsKey(type);
 		CONSTRUCTORS.put(type, constructor);
-	}
-
-	public static void addRoots(String type, Consumer<IPeer> consumer)
-	{
-		assert !ROOTS.containsKey(type);
-		ROOTS.put(type, consumer);
 	}
 
 	private static IPeer construct(Function<String, IPeer> constructor, String id)
@@ -99,12 +92,12 @@ public class PeerState
 					var constructor = CONSTRUCTORS.get(type);
 					if (constructor != null)
 					{
-						IPeer peer = construct(constructor, stmt.getSubject().toString());
-						var root = ROOTS.get(type);
-						if (root != null)
-						{
-							root.accept(peer);
-						}
+						construct(constructor, stmt.getSubject().toString());
+//						var root = ROOTS.get(type);
+//						if (root != null)
+//						{
+//							root.accept(peer);
+//						}
 					}
 				});
 	}
@@ -118,7 +111,6 @@ public class PeerState
 
 	public static void update(IPeer peer, Statement stmt)
 	{
-		System.out.println("IN UPDATE PEER FOR STATEMENT " + stmt);
 		apply(peer.getUpdater(stmt.getPredicate().toString()), stmt);
 	}
 //

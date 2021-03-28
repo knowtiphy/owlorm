@@ -29,8 +29,8 @@ import static org.knowtiphy.utils.JenaUtils.R;
 public class Peer extends Entity implements IPeer
 {
 	private final SimpleBooleanProperty disabled = new SimpleBooleanProperty(false);
-	private final Map<String, Consumer<Statement>> peerUpdater= new HashMap<>();
-	private final Map<String, Consumer<Statement>>  peerDeleter= new HashMap<>();
+	private final Map<String, Consumer<Statement>> peerUpdater = new HashMap<>();
+	private final Map<String, Consumer<Statement>> peerDeleter = new HashMap<>();
 
 	public Peer(String id)
 	{
@@ -72,7 +72,7 @@ public class Peer extends Entity implements IPeer
 
 	public void declareU(String predicate, ObjectProperty<ZonedDateTime> property)
 	{
-		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getLD));
+		peerUpdater.put(predicate, new PropertyUpdater<>(property, JenaUtils::getDate));
 	}
 
 	public void declareU(String predicate, StringProperty property)
@@ -85,7 +85,7 @@ public class Peer extends Entity implements IPeer
 		peerUpdater.put(predicate, new CollectionUpdater<>(set, f));
 	}
 
-	public <K, V> void declareU(String predicate, Map<K,V> map,
+	public <K, V> void declareU(String predicate, Map<K, V> map,
 								Function<Statement, K> key, Function<Statement, V> value)
 	{
 		peerUpdater.put(predicate, new MapUpdater<>(map, key, value));
@@ -153,13 +153,27 @@ public class Peer extends Entity implements IPeer
 	public void initialize(QuerySolution it)
 	{
 		Model model = ModelFactory.createDefaultModel();
-		model.add(R(model ,getId()), P(model, it.get("p").toString()), it.get("o"));
+		model.add(R(model, getId()), P(model, it.get("p").toString()), it.get("o"));
 		initialize(model);
 	}
+
+	//	this is a hack but will do for the moment
+	public void initialize(QuerySolution it, String property)
+	{
+		Model model = ModelFactory.createDefaultModel();
+		model.add(R(model, getId()), P(model, property), it.get("o"));
+		initialize(model);
+	}
+
 
 	public void initialize(ResultSet rs)
 	{
 		rs.forEachRemaining(this::initialize);
+	}
+
+	public void initialize(ResultSet rs, String property)
+	{
+		rs.forEachRemaining((soln) -> initialize(soln, property));
 	}
 
 	public static void disable(Collection<IPeer> peers)

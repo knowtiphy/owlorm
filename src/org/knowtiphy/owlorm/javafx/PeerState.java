@@ -15,7 +15,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 //	TODO -- all this code should go away
@@ -70,11 +69,6 @@ public class PeerState
 				}
 			});
 		}
-	}
-
-	public static void delta(Model added, Model deleted)
-	{
-		delta(added, deleted, stmt -> true);
 	}
 
 	private static void delete(IPeer peer, Statement stmt)
@@ -140,10 +134,10 @@ public class PeerState
 //  update/add relationships between existing peer objects (which may have just been introduced)
 //  delete existing peers
 
-	public static void delta(Model added, Model deleted, Predicate<Statement> predicate)
+	public static void delta(Model added, Model deleted)
 	{
-		LOGGER.fine(() -> JenaUtils.toString("+", added, predicate));
-		LOGGER.fine(() -> JenaUtils.toString("-", deleted, predicate));
+		LOGGER.fine(() -> JenaUtils.toString(added));
+		LOGGER.fine(() -> JenaUtils.toString(deleted));
 
 		processExisting(deleted, DATA_PROPERTIES, PeerState::delete);
 		processExisting(deleted, OBJECT_PROPERTIES, PeerState::delete);

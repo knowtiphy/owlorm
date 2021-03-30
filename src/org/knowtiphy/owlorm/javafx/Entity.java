@@ -5,16 +5,23 @@ import java.util.Objects;
 public class Entity implements IEntity
 {
 	private final String id;
+	private final String type;
 
-	public Entity(String id)
+	public Entity(String id, String type)
 	{
 		this.id = id;
+		this.type = type;
 	}
 
 	@Override
 	public String getId()
 	{
 		return id;
+	}
+
+	public String getType()
+	{
+		return type;
 	}
 
 	@Override

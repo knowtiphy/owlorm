@@ -14,7 +14,9 @@ import org.knowtiphy.utils.JenaUtils;
 import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -25,7 +27,7 @@ public class Peer extends Entity implements IPeer
 {
 	private final SimpleBooleanProperty disabledProperty = new SimpleBooleanProperty(false);
 
-	private final Map<String, Consumer<RDFNode>> updaters = new HashMap<>();
+	private final Map<String, IUpdater> updaters = new HashMap<>();
 
 	public Peer(String id, String type)
 	{
@@ -38,9 +40,9 @@ public class Peer extends Entity implements IPeer
 		return disabledProperty;
 	}
 
-	public void declareU(String predicate, Consumer<RDFNode> consumer)
+	public void declareU(String predicate, IUpdater updater)
 	{
-		updaters.put(predicate, consumer);
+		updaters.put(predicate, updater);
 	}
 
 	public void declareU(String predicate, BooleanProperty property)
@@ -73,16 +75,6 @@ public class Peer extends Entity implements IPeer
 		declareU(predicate, new CollectionUpdater<>(set, f));
 	}
 
-	public void initialize(ResultSet rs, String property)
-	{
-		rs.forEachRemaining((soln) -> initialize(soln, property));
-	}
-
-	public void initialize(ResultSet rs)
-	{
-		rs.forEachRemaining(this::initialize);
-	}
-
 	public static void disable(Collection<IPeer> peers)
 	{
 		peers.forEach(peer -> peer.disabledProperty().set(true));
@@ -110,9 +102,29 @@ public class Peer extends Entity implements IPeer
 		apply(updaters.get(property), it);
 	}
 
-	private void initialize(QuerySolution it)
+	public void initialize(ResultSet rs, String property)
 	{
-		initialize(it, it.get("p").toString());
+		rs.forEachRemaining((soln) -> initialize(soln, property));
+	}
+
+	private void initialize(QuerySolution it, Set<String> first)
+	{
+		var property = it.get("p").toString();
+		if(!first.contains(property))
+		{
+			first.add(property);
+			//	TODO -- we look up the updater twice -- once in apply and once here ...
+			IUpdater updater = updaters.get(property);
+			if(updater != null)
+				updater.clear();
+		}
+		initialize(it, property);
+	}
+
+	public void initialize(ResultSet rs)
+	{
+		var first = new HashSet<String>();
+		rs.forEachRemaining((soln) -> initialize(soln, first));
 	}
 }
 

@@ -14,9 +14,8 @@ import java.util.Set;
 //  TODO -- this is a crappy name but ...
 public class QueryHelper
 {
-	//	TODO -- not sure if the type part here is required, but makes the query tighter
-	private static final ParameterizedSparqlString GET_IDS =
-			new ParameterizedSparqlString("select * where { ?s <" + Vocabulary.CONTAINS + "> ?o. ?o a ?type}");
+	private static final ParameterizedSparqlString GET_IDS = new ParameterizedSparqlString(
+			"select * where { ?s <" + Vocabulary.CONTAINS + "> ?o. ?o a ?type}");
 
 	private static final ParameterizedSparqlString GET_ATTRIBUTES =
 			new ParameterizedSparqlString("select * where { ?s ?p ?o filter(?p != ?type) }");
@@ -58,24 +57,3 @@ public class QueryHelper
 		return storage.query(GET_ATTRIBUTES.toString());
 	}
 }
-
-//fun diff(storage : IStorage,
-//         query : SelectBuilder,
-//         id : String,
-//         proj : String,
-//         map : Map<String, *>) : Triple<Set<String>, Set<String>, Set<String>>
-//{
-//	val stored = HashSet<String>()
-//
-//	query.setVar(Var.alloc("id"), NodeFactory.createURI(id))
-//	storage.query(query.buildString()).forEach { stored.add(it.getResource(proj).toString()) }
-//
-//	val toAdd = HashSet<String>()
-//	val toDelete = HashSet<String>()
-//	val toUpdate = HashSet<String>()
-//
-//	stored.forEach { if (!map.containsKey(it)) toAdd.add(it) else toUpdate.add(it) }
-//	map.keys.forEach { if (!stored.contains(it)) toDelete.add(it) }
-//
-//	return Triple(toAdd, toDelete, toUpdate)
-//}

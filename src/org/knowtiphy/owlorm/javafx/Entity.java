@@ -4,19 +4,19 @@ import java.util.Objects;
 
 public class Entity implements IEntity
 {
-	private final String id;
+	private final String uri;
 	private final String type;
 
-	public Entity(String id, String type)
+	public Entity(String uri, String type)
 	{
-		this.id = id;
+		this.uri = uri;
 		this.type = type;
 	}
 
 	@Override
-	public String getId()
+	public String getUri()
 	{
-		return id;
+		return uri;
 	}
 
 	public String getType()
@@ -28,7 +28,7 @@ public class Entity implements IEntity
 	public int hashCode()
 	{
 		int hash = 3;
-		hash = 23 * hash + Objects.hashCode(this.id);
+		hash = 23 * hash + Objects.hashCode(this.uri);
 		return hash;
 	}
 
@@ -48,13 +48,13 @@ public class Entity implements IEntity
 			return false;
 		}
 		final Entity other = (Entity) obj;
-		//	two entities are equal of their ids are the same
-		return Objects.equals(this.id, other.id);
+		//	two entities are equal of their uris are the same
+		return Objects.equals(this.uri, other.uri);
 	}
 
 	@Override
 	public String toString()
 	{
-		return "Entity{id=" + id + "}";
+		return "Entity{uri =" + uri + "}";
 	}
 }

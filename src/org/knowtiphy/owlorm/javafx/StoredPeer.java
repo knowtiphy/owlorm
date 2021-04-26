@@ -4,7 +4,6 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.StringProperty;
-import javafx.collections.ObservableList;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.RDFNode;
@@ -14,6 +13,7 @@ import org.knowtiphy.utils.JenaUtils;
 import org.knowtiphy.utils.Triple;
 
 import java.time.ZonedDateTime;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -24,11 +24,13 @@ import java.util.function.Function;
 public class StoredPeer extends Entity implements IStoredPeer
 {
 	private final IStorage storage;
+	private final Map<String, IUpdater> updaters;
 
 	public StoredPeer(String uri, String type, IStorage storage)
 	{
 		super(uri, type);
 		this.storage = storage;
+		updaters = new HashMap<>();
 	}
 
 	public IStorage getStorage()
@@ -36,46 +38,40 @@ public class StoredPeer extends Entity implements IStoredPeer
 		return storage;
 	}
 
-	private final Map<String, IUpdater> updaters = new HashMap<>();
-
-	public void declareU(String predicate, IUpdater updater)
+	public void addUpdater(String p, IUpdater updater)
 	{
-		updaters.put(predicate, updater);
+		updaters.put(p, updater);
 	}
 
-	public void declareU(String predicate, BooleanProperty property)
+	public void addUpdater(String p, BooleanProperty property)
 	{
-		declareU(predicate, new PropertyUpdater<>(property, JenaUtils::getB));
+		addUpdater(p, new PropertyUpdater<>(property, JenaUtils::getB));
 	}
 
-	public void declareU(String predicate, IntegerProperty property)
+	public void addUpdater(String p, IntegerProperty property)
 	{
-		declareU(predicate, new PropertyUpdater<>(property, JenaUtils::getI));
+		addUpdater(p, new PropertyUpdater<>(property, JenaUtils::getI));
 	}
 
-	public void declareU(String predicate, StringProperty property)
+	public void addUpdater(String p, StringProperty property)
 	{
-		declareU(predicate, new PropertyUpdater<>(property, JenaUtils::getS));
+		addUpdater(p, new PropertyUpdater<>(property, JenaUtils::getS));
 	}
 
-	public void declareU(String predicate, ObjectProperty<ZonedDateTime> property)
+	public void addUpdater(String p, ObjectProperty<ZonedDateTime> property)
 	{
-		declareU(predicate, new PropertyUpdater<>(property, JenaUtils::getDate));
+		addUpdater(p, new PropertyUpdater<>(property, JenaUtils::getDT));
 	}
 
-	public void declareU(String predicate, ObservableList<String> set)
+	public <T> void addUpdater(String p, Collection<T> collection, Function<RDFNode, T> f)
 	{
-		declareU(predicate, new CollectionUpdater<>(set, JenaUtils::getS));
+		addUpdater(p, new CollectionUpdater<>(collection, f));
 	}
 
-	public <T> void declareU(String predicate, ObservableList<T> set, Function<RDFNode, T> f)
+	//	apply an updater
+	private void update(Consumer<RDFNode> change, QuerySolution soln)
 	{
-		declareU(predicate, new CollectionUpdater<>(set, f));
-	}
-
-	private void apply(Consumer<RDFNode> change, QuerySolution soln)
-	{
-		//  ignore -- just means we don't have an updater/deleter for that property
+		//  ignore -- just means we don't have an updater for that property
 		if (change != null)
 		{
 			try
@@ -90,28 +86,31 @@ public class StoredPeer extends Entity implements IStoredPeer
 		}
 	}
 
-	private void initialize(QuerySolution it, String property)
+	private void initialize(QuerySolution it, String p)
 	{
-		apply(updaters.get(property), it);
+		update(updaters.get(p), it);
 	}
 
-	public void initialize(ResultSet rs, String property)
+	public void initialize(ResultSet rs, String p)
 	{
-		rs.forEachRemaining((soln) -> initialize(soln, property));
+		rs.forEachRemaining((soln) -> initialize(soln, p));
 	}
 
 	private void initialize(QuerySolution it, Set<String> first)
 	{
-		var property = it.get("p").toString();
-		if(!first.contains(property))
+		var p = it.get("p").toString();
+		if (!first.contains(p))
 		{
-			first.add(property);
+			first.add(p);
 			//	TODO -- we look up the updater twice -- once in apply and once here ...
-			IUpdater updater = updaters.get(property);
-			if(updater != null)
+			IUpdater updater = updaters.get(p);
+			if (updater != null)
+			{
 				updater.clear();
+			}
 		}
-		initialize(it, property);
+
+		initialize(it, p);
 	}
 
 	public void initialize(ResultSet rs)
@@ -121,7 +120,7 @@ public class StoredPeer extends Entity implements IStoredPeer
 	}
 
 	//	this one might be a bit too generic even for me :)
-	protected Triple<Set<String>, Set<String>, Set<String>> diff(
+	public Triple<Set<String>, Set<String>, Set<String>> diff(
 			String containedType, Set<String> holding) throws StorageException
 	{
 		return QueryHelper.diff(storage, getUri(), containedType, holding);

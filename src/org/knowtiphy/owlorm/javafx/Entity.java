@@ -55,6 +55,9 @@ public class Entity implements IEntity
 	@Override
 	public String toString()
 	{
-		return "Entity{uri =" + uri + "}";
+		return "Entity{" +
+				"uri='" + uri + '\'' +
+				", type='" + type + '\'' +
+				'}';
 	}
 }

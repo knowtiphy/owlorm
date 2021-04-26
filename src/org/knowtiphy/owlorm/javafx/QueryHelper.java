@@ -29,8 +29,7 @@ public class QueryHelper
 
 		var stored = JenaUtils.collect(
 				storage.query(GET_IDS.toString()),
-				new HashSet<>(),
-				(soln) -> soln.getResource("o").toString());
+				(soln) -> soln.getResource("o").toString(), new HashSet<>());
 
 		//  work out what the added and deleted IDs are, and the IDs that possibly require updating
 

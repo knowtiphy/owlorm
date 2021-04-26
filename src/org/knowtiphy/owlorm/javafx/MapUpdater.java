@@ -1,7 +1,6 @@
 package org.knowtiphy.owlorm.javafx;
 
 import org.apache.jena.rdf.model.RDFNode;
-import org.apache.jena.rdf.model.Statement;
 
 import java.util.Map;
 import java.util.function.Function;
@@ -12,10 +11,10 @@ import java.util.function.Function;
 class MapUpdater<K, V> implements IUpdater
 {
     private final Map<K, V> map;
-    private final Function<Statement, K> key;
-    private final Function<Statement, V> value;
+    private final Function<RDFNode, K> key;
+    private final Function<RDFNode, V> value;
 
-    public MapUpdater(Map<K, V> map, Function<Statement, K> key, Function<Statement, V> value)
+    public MapUpdater(Map<K, V> map, Function<RDFNode, K> key, Function<RDFNode, V> value)
     {
         this.map = map;
         this.key = key;
@@ -31,7 +30,6 @@ class MapUpdater<K, V> implements IUpdater
     @Override
     public void accept(RDFNode node)
     {
-        //  TODO
-        //map.put(key.apply(stmt), value.apply(stmt));
+        map.put(key.apply(node), value.apply(node));
     }
 }

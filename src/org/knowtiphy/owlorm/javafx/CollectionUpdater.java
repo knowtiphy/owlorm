@@ -1,8 +1,8 @@
 package org.knowtiphy.owlorm.javafx;
 
-import javafx.collections.ObservableList;
 import org.apache.jena.rdf.model.RDFNode;
 
+import java.util.Collection;
 import java.util.function.Function;
 
 /**
@@ -10,10 +10,10 @@ import java.util.function.Function;
  */
 class CollectionUpdater<T> implements IUpdater
 {
-	private final ObservableList<T> collection;
+	private final Collection<T> collection;
 	private final Function<RDFNode, T> extractValue;
 
-	public CollectionUpdater(ObservableList<T> collection, Function<RDFNode, T> extractValue)
+	public CollectionUpdater(Collection<T> collection, Function<RDFNode, T> extractValue)
 	{
 		this.collection = collection;
 		this.extractValue = extractValue;
